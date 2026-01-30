@@ -7,24 +7,49 @@
 <style>
   body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; }
   #reader { width: 100%; max-width: 600px; margin: auto; }
-  #status { margin-top: 20px; font-weight: bold; color: green; font-size: 18px; }
-  #rekap { margin-top: 20px; font-weight: bold; color: blue; font-size: 20px; }
+  #notif {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #4caf50;
+    color: white;
+    padding: 15px 25px;
+    border-radius: 5px;
+    font-size: 18px;
+    line-height: 1.4;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1s ease-out;
+    white-space: pre-line;
+  }
 </style>
 </head>
 <body>
 
 <h1>Presensi Karyawan</h1>
 <div id="reader"></div>
-<div id="status">Menunggu scan...</div>
-<div id="rekap"></div>
+<div id="notif"></div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-const statusEl = document.getElementById("status");
-const rekapEl = document.getElementById("rekap");
+const notifEl = document.getElementById("notif");
 
-// Google Form URL (ubah sesuai Form kamu)
+// Google Form URL
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSckBacoI9-VNL-QZnlepSUKIYHo_tMLH7DRuuUxSCQp-lE56g/formResponse";
+
+// Track karyawan yang sudah scan hari ini
+let scannedToday = new Set();
+let isSubmitting = false;
+
+// Fungsi tampilkan notif sementara
+function showNotif(message, color="#4caf50") {
+  notifEl.innerText = message;
+  notifEl.style.backgroundColor = color;
+  notifEl.style.opacity = "1";
+  setTimeout(() => { notifEl.style.opacity = "0"; }, 3500); // fade out 3.5 detik
+}
 
 // Fungsi kirim ke Google Form via POST
 function kirimForm(entryData) {
@@ -35,40 +60,56 @@ function kirimForm(entryData) {
 
   fetch(FORM_URL, { method: "POST", mode: "no-cors", body: formData })
     .then(() => {
-      statusEl.innerText = "Terkirim ✔";
-
+      // Siapkan info waktu & tanggal
       const now = new Date();
       const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       const tanggal = now.toLocaleDateString('id-ID', options);
       const jam = now.toLocaleTimeString('id-ID');
 
-      rekapEl.innerHTML = `
-        ${tanggal} <br>
-        ${jam} <br>
-        ${entryData.nama} <br>
-        ${entryData.jabatan}
-      `;
-
-      setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 2000);
+      const notifText = `${entryData.nama}\n${entryData.jabatan}\n${tanggal}\n${jam}\nPresensi Berhasil ✔`;
+      showNotif(notifText);
+      isSubmitting = false; // unlock scanner
     })
     .catch(err => {
       console.error(err);
-      statusEl.innerText = "Gagal terkirim ❌";
+      showNotif("Gagal mengirim ❌", "#f44336");
+      isSubmitting = false;
     });
 }
 
 // Callback ketika QR berhasil discan
-function onScanSuccess(decodedText, decodedResult) {
-  console.log("QR Scanned: ", decodedText);
+function onScanSuccess(decodedText) {
+  if (isSubmitting) return; // prevent double submit
+  isSubmitting = true;
 
-  // QR Format: ID|Nama|Jabatan
   const parts = decodedText.split("|");
+  if(parts.length < 3){
+    showNotif("QR tidak valid ❌", "#f44336");
+    isSubmitting = false;
+    return;
+  }
+
   const entryData = {
-    id: parts[0] || "-",
-    nama: parts[1] || "-",
-    jabatan: parts[2] || "-"
+    id: parts[0],
+    nama: parts[1],
+    jabatan: parts[2]
   };
 
+  // cek jika sudah scan hari ini
+  const todayKey = entryData.id + "_" + new Date().toLocaleDateString("id-ID");
+  if (scannedToday.has(todayKey)) {
+    const now = new Date();
+    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const tanggal = now.toLocaleDateString('id-ID', options);
+    const jam = now.toLocaleTimeString('id-ID');
+
+    const notifText = `${entryData.nama}\n${entryData.jabatan}\n${tanggal}\n${jam}\nSudah presensi hari ini ❌\nSilakan besok lagi`;
+    showNotif(notifText, "#ff9800");
+    isSubmitting = false;
+    return;
+  }
+
+  scannedToday.add(todayKey);
   kirimForm(entryData);
 }
 
@@ -81,13 +122,18 @@ window.onload = function() {
     if (cameras && cameras.length) {
       const cameraId = cameras[0].id;
       const html5QrcodeScanner = new Html5Qrcode("reader");
-      html5QrcodeScanner.start(cameraId, { fps: 10, qrbox: 250 }, onScanSuccess, onScanFailure);
+      html5QrcodeScanner.start(
+        cameraId,
+        { fps: 10, qrbox: 250 },
+        onScanSuccess,
+        onScanFailure
+      );
     } else {
-      statusEl.innerText = "Kamera tidak ditemukan ❌";
+      showNotif("Kamera tidak ditemukan ❌", "#f44336");
     }
   }).catch(err => {
     console.error(err);
-    statusEl.innerText = "Tidak bisa mengakses kamera ❌";
+    showNotif("Tidak bisa mengakses kamera ❌", "#f44336");
   });
 };
 </script>
