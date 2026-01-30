@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>QR Auto Submit Google Form</title>
+<title>Presensi QR Auto</title>
 <style>
-  body { font-family: sans-serif; text-align: center; padding: 20px; }
+  body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; }
   #reader { width: 100%; max-width: 600px; margin: auto; }
-  #status { margin-top: 20px; font-weight: bold; color: green; }
+  #status { margin-top: 20px; font-weight: bold; color: green; font-size: 18px; }
+  #rekap { margin-top: 20px; font-weight: bold; color: blue; font-size: 20px; }
 </style>
 </head>
 <body>
@@ -15,54 +16,79 @@
 <h1>Presensi Karyawan</h1>
 <div id="reader"></div>
 <div id="status">Menunggu scan...</div>
+<div id="rekap"></div>
 
 <!-- html5-qrcode library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-  const statusEl = document.getElementById("status");
+const statusEl = document.getElementById("status");
+const rekapEl = document.getElementById("rekap");
 
-  // Fungsi kirim data ke Google Form
-  function kirimForm(urlPreFill) {
-    fetch(urlPreFill, { method: 'GET', mode: 'no-cors' })
-      .then(() => {
-        statusEl.innerText = "Terkirim ✔";
-        setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 2000);
-      })
-      .catch(err => {
-        console.error(err);
-        statusEl.innerText = "Gagal terkirim ❌";
-      });
-  }
+// Fungsi kirim ke Google Form
+function kirimForm(urlPreFill) {
+  fetch(urlPreFill, { method: 'GET', mode: 'no-cors' })
+    .then(() => {
+      statusEl.innerText = "Terkirim ✔";
 
-  // Fungsi dipanggil ketika QR berhasil discan
-  function onScanSuccess(decodedText, decodedResult) {
-    console.log("QR Scanned: ", decodedText);
-    kirimForm(decodedText); // Kirim langsung ke Google Form
-  }
+      // Parsing URL untuk ambil Nama & Jabatan
+      const urlParams = new URLSearchParams(urlPreFill.split('?')[1]);
+      const nama = urlParams.get('entry.456') || "-";
+      const jabatan = urlParams.get('entry.789') || "-";
 
-  // Fungsi ketika scan gagal (tidak perlu menampilkan error)
-  function onScanFailure(error) {}
+      // Ambil tanggal & jam
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const tanggal = now.toLocaleDateString('id-ID', options);
+      const jam = now.toLocaleTimeString('id-ID');
 
-  // Inisialisasi kamera & scanner otomatis
-  window.onload = function() {
-    Html5Qrcode.getCameras().then(cameras => {
-      if (cameras && cameras.length) {
-        const cameraId = cameras[0].id; // pakai kamera belakang pertama
-        const html5QrcodeScanner = new Html5Qrcode("reader");
-        html5QrcodeScanner.start(
-          cameraId,
-          { fps: 10, qrbox: 250 },
-          onScanSuccess,
-          onScanFailure
-        );
-      } else {
-        statusEl.innerText = "Kamera tidak ditemukan ❌";
-      }
-    }).catch(err => {
+      // Tampilkan rekap
+      rekapEl.innerHTML = `
+        ${tanggal} <br>
+        ${jam} <br>
+        ${nama} <br>
+        ${jabatan}
+      `;
+
+      // Reset status siap scan berikutnya
+      setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 2000);
+    })
+    .catch(err => {
       console.error(err);
-      statusEl.innerText = "Tidak bisa mengakses kamera ❌";
+      statusEl.innerText = "Gagal terkirim ❌";
     });
-  }
+}
+
+// Callback ketika QR berhasil discan
+function onScanSuccess(decodedText, decodedResult) {
+  console.log("QR Scanned: ", decodedText);
+  kirimForm(decodedText);
+}
+
+// Callback ketika scan gagal (opsional)
+function onScanFailure(error) {
+  // Tidak perlu menampilkan error
+}
+
+// Inisialisasi scanner & kamera otomatis
+window.onload = function() {
+  Html5Qrcode.getCameras().then(cameras => {
+    if (cameras && cameras.length) {
+      const cameraId = cameras[0].id; // pakai kamera belakang pertama
+      const html5QrcodeScanner = new Html5Qrcode("reader");
+      html5QrcodeScanner.start(
+        cameraId,
+        { fps: 10, qrbox: 250 },
+        onScanSuccess,
+        onScanFailure
+      );
+    } else {
+      statusEl.innerText = "Kamera tidak ditemukan ❌";
+    }
+  }).catch(err => {
+    console.error(err);
+    statusEl.innerText = "Tidak bisa mengakses kamera ❌";
+  });
+};
 </script>
 
 </body>
