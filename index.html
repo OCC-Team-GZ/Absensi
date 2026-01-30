@@ -18,38 +18,37 @@
 <div id="status">Menunggu scan...</div>
 <div id="rekap"></div>
 
-<!-- html5-qrcode library -->
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 const statusEl = document.getElementById("status");
 const rekapEl = document.getElementById("rekap");
 
-// Fungsi kirim ke Google Form
-function kirimForm(urlPreFill) {
-  fetch(urlPreFill, { method: 'GET', mode: 'no-cors' })
+// Google Form URL (ubah sesuai Form kamu)
+const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSckBacoI9-VNL-QZnlepSUKIYHo_tMLH7DRuuUxSCQp-lE56g/formResponse";
+
+// Fungsi kirim ke Google Form via POST
+function kirimForm(entryData) {
+  const formData = new FormData();
+  formData.append("entry.2129652086", entryData.id || "-");
+  formData.append("entry.1423031901", entryData.nama || "-");
+  formData.append("entry.476602258", entryData.jabatan || "-");
+
+  fetch(FORM_URL, { method: "POST", mode: "no-cors", body: formData })
     .then(() => {
       statusEl.innerText = "Terkirim ✔";
 
-      // Parsing URL untuk ambil Nama & Jabatan
-      const urlParams = new URLSearchParams(urlPreFill.split('?')[1]);
-      const nama = urlParams.get('entry.456') || "-";
-      const jabatan = urlParams.get('entry.789') || "-";
-
-      // Ambil tanggal & jam
       const now = new Date();
       const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       const tanggal = now.toLocaleDateString('id-ID', options);
       const jam = now.toLocaleTimeString('id-ID');
 
-      // Tampilkan rekap
       rekapEl.innerHTML = `
         ${tanggal} <br>
         ${jam} <br>
-        ${nama} <br>
-        ${jabatan}
+        ${entryData.nama} <br>
+        ${entryData.jabatan}
       `;
 
-      // Reset status siap scan berikutnya
       setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 2000);
     })
     .catch(err => {
@@ -61,26 +60,28 @@ function kirimForm(urlPreFill) {
 // Callback ketika QR berhasil discan
 function onScanSuccess(decodedText, decodedResult) {
   console.log("QR Scanned: ", decodedText);
-  kirimForm(decodedText);
+
+  // QR Format: ID|Nama|Jabatan
+  const parts = decodedText.split("|");
+  const entryData = {
+    id: parts[0] || "-",
+    nama: parts[1] || "-",
+    jabatan: parts[2] || "-"
+  };
+
+  kirimForm(entryData);
 }
 
-// Callback ketika scan gagal (opsional)
-function onScanFailure(error) {
-  // Tidak perlu menampilkan error
-}
+// Callback scan gagal
+function onScanFailure(error) {}
 
-// Inisialisasi scanner & kamera otomatis
+// Inisialisasi kamera & scanner otomatis
 window.onload = function() {
   Html5Qrcode.getCameras().then(cameras => {
     if (cameras && cameras.length) {
-      const cameraId = cameras[0].id; // pakai kamera belakang pertama
+      const cameraId = cameras[0].id;
       const html5QrcodeScanner = new Html5Qrcode("reader");
-      html5QrcodeScanner.start(
-        cameraId,
-        { fps: 10, qrbox: 250 },
-        onScanSuccess,
-        onScanFailure
-      );
+      html5QrcodeScanner.start(cameraId, { fps: 10, qrbox: 250 }, onScanSuccess, onScanFailure);
     } else {
       statusEl.innerText = "Kamera tidak ditemukan ❌";
     }
