@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Auto Submit Google Form</title>
+<style>
+  body { font-family: sans-serif; text-align: center; padding: 20px; }
+  #reader { width: 100%; max-width: 600px; margin: auto; }
+  #status { margin-top: 20px; font-weight: bold; color: green; }
+</style>
+</head>
+<body>
+
+<h1>Presensi Karyawan</h1>
+<div id="reader"></div>
+<div id="status">Menunggu scan...</div>
+
+<!-- html5-qrcode library -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script>
+  const statusEl = document.getElementById("status");
+
+  // Fungsi kirim data ke Google Form
+  function kirimForm(urlPreFill) {
+    fetch(urlPreFill, { method: 'GET', mode: 'no-cors' })
+      .then(() => {
+        statusEl.innerText = "Terkirim ✔";
+        setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 2000);
+      })
+      .catch(err => {
+        console.error(err);
+        statusEl.innerText = "Gagal terkirim ❌";
+      });
+  }
+
+  // Fungsi dipanggil ketika QR berhasil discan
+  function onScanSuccess(decodedText, decodedResult) {
+    console.log("QR Scanned: ", decodedText);
+    kirimForm(decodedText); // Kirim langsung ke Google Form
+  }
+
+  // Fungsi ketika scan gagal (tidak perlu menampilkan error)
+  function onScanFailure(error) {}
+
+  // Inisialisasi kamera & scanner otomatis
+  window.onload = function() {
+    Html5Qrcode.getCameras().then(cameras => {
+      if (cameras && cameras.length) {
+        const cameraId = cameras[0].id; // pakai kamera belakang pertama
+        const html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+          cameraId,
+          { fps: 10, qrbox: 250 },
+          onScanSuccess,
+          onScanFailure
+        );
+      } else {
+        statusEl.innerText = "Kamera tidak ditemukan ❌";
+      }
+    }).catch(err => {
+      console.error(err);
+      statusEl.innerText = "Tidak bisa mengakses kamera ❌";
+    });
+  }
+</script>
+
+</body>
+</html>
