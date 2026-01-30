@@ -7,34 +7,21 @@
 <style>
   body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; }
   #reader { width: 100%; max-width: 600px; margin: auto; }
-  #notif {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background-color: #4caf50;
-    color: white;
-    padding: 15px 25px;
-    border-radius: 5px;
-    font-size: 18px;
-    line-height: 1.4;
-    text-align: center;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 1s ease-out;
-    white-space: pre-line;
-  }
+  #status { margin-top: 20px; font-weight: bold; color: green; font-size: 18px; }
+  #rekap { margin-top: 20px; font-weight: bold; color: #333; font-size: 18px; text-align: left; white-space: pre-line; }
 </style>
 </head>
 <body>
 
 <h1>Presensi Team OCC</h1>
 <div id="reader"></div>
-<div id="notif"></div>
+<div id="status">Menunggu scan...</div>
+<div id="rekap"></div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-const notifEl = document.getElementById("notif");
+const statusEl = document.getElementById("status");
+const rekapEl = document.getElementById("rekap");
 
 // Google Form URL
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSckBacoI9-VNL-QZnlepSUKIYHo_tMLH7DRuuUxSCQp-lE56g/formResponse";
@@ -42,14 +29,6 @@ const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSckBacoI9-VNL-QZnlepS
 // Track karyawan yang sudah scan hari ini
 let scannedToday = new Set();
 let isSubmitting = false;
-
-// Fungsi tampilkan notif sementara
-function showNotif(message, color="#4caf50") {
-  notifEl.innerText = message;
-  notifEl.style.backgroundColor = color;
-  notifEl.style.opacity = "1";
-  setTimeout(() => { notifEl.style.opacity = "0"; }, 3500); // fade out 3.5 detik
-}
 
 // Fungsi kirim ke Google Form via POST
 function kirimForm(entryData) {
@@ -66,13 +45,22 @@ function kirimForm(entryData) {
       const tanggal = now.toLocaleDateString('id-ID', options);
       const jam = now.toLocaleTimeString('id-ID');
 
-      const notifText = `${entryData.nama}\n${entryData.jabatan}\n${tanggal}\n${jam}\nPresensi Berhasil ✔`;
-      showNotif(notifText);
+      // Update status & rekap
+      statusEl.innerText = "Presensi Berhasil ✔";
+      rekapEl.innerText = `
+Nama: ${entryData.nama}
+Jabatan: ${entryData.jabatan}
+Hari/Tanggal: ${tanggal}
+Jam: ${jam}
+      `;
+
+      // Reset status setelah beberapa detik
+      setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 3000);
       isSubmitting = false; // unlock scanner
     })
     .catch(err => {
       console.error(err);
-      showNotif("Gagal mengirim ❌", "#f44336");
+      statusEl.innerText = "Gagal mengirim ❌";
       isSubmitting = false;
     });
 }
@@ -84,7 +72,7 @@ function onScanSuccess(decodedText) {
 
   const parts = decodedText.split("|");
   if(parts.length < 3){
-    showNotif("QR tidak valid ❌", "#f44336");
+    statusEl.innerText = "QR tidak valid ❌";
     isSubmitting = false;
     return;
   }
@@ -103,8 +91,13 @@ function onScanSuccess(decodedText) {
     const tanggal = now.toLocaleDateString('id-ID', options);
     const jam = now.toLocaleTimeString('id-ID');
 
-    const notifText = `${entryData.nama}\n${entryData.jabatan}\n${tanggal}\n${jam}\nSudah presensi hari ini ❌\nSilakan besok lagi`;
-    showNotif(notifText, "#ff9800");
+    statusEl.innerText = "Sudah presensi hari ini ❌ Silakan besok lagi";
+    rekapEl.innerText = `
+Nama: ${entryData.nama}
+Jabatan: ${entryData.jabatan}
+Hari/Tanggal: ${tanggal}
+Jam: ${jam}
+    `;
     isSubmitting = false;
     return;
   }
@@ -129,11 +122,11 @@ window.onload = function() {
         onScanFailure
       );
     } else {
-      showNotif("Kamera tidak ditemukan ❌", "#f44336");
+      statusEl.innerText = "Kamera tidak ditemukan ❌";
     }
   }).catch(err => {
     console.error(err);
-    showNotif("Tidak bisa mengakses kamera ❌", "#f44336");
+    statusEl.innerText = "Tidak bisa mengakses kamera ❌";
   });
 };
 </script>
