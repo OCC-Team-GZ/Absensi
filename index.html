@@ -7,15 +7,18 @@
 <style>
   body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f0f0f0; }
   #reader { width: 100%; max-width: 600px; margin: auto; }
-  #status { margin-top: 20px; font-weight: bold; color: green; font-size: 18px; }
+  #status { margin-top: 20px; font-weight: bold; font-size: 18px; }
   #rekap { margin-top: 20px; font-weight: bold; color: #333; font-size: 18px; text-align: left; white-space: pre-line; }
+  .success { color: green; }
+  .warning { color: orange; }
+  .error { color: red; }
 </style>
 </head>
 <body>
 
 <h1>Presensi Team OCC</h1>
 <div id="reader"></div>
-<div id="status">Menunggu scan...</div>
+<div id="status" class="success">Menunggu scan...</div>
 <div id="rekap"></div>
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -39,7 +42,6 @@ function kirimForm(entryData) {
 
   fetch(FORM_URL, { method: "POST", mode: "no-cors", body: formData })
     .then(() => {
-      // Siapkan info waktu & tanggal
       const now = new Date();
       const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
       const tanggal = now.toLocaleDateString('id-ID', options);
@@ -47,44 +49,42 @@ function kirimForm(entryData) {
 
       // Update status & rekap
       statusEl.innerText = "Presensi Berhasil ✔";
+      statusEl.className = "success";
       rekapEl.innerText = `
 Nama: ${entryData.nama}
 Jabatan: ${entryData.jabatan}
 Hari/Tanggal: ${tanggal}
 Jam: ${jam}
       `;
-
-      // Reset status setelah beberapa detik
-      setTimeout(() => { statusEl.innerText = "Menunggu scan..."; }, 3000);
-      isSubmitting = false; // unlock scanner
+      setTimeout(() => { statusEl.innerText = "Menunggu scan..."; statusEl.className="success"; }, 3000);
+      isSubmitting = false;
     })
     .catch(err => {
       console.error(err);
       statusEl.innerText = "Gagal mengirim ❌";
+      statusEl.className = "error";
       isSubmitting = false;
     });
 }
 
 // Callback ketika QR berhasil discan
 function onScanSuccess(decodedText) {
-  if (isSubmitting) return; // prevent double submit
+  if (isSubmitting) return;
   isSubmitting = true;
 
+  // QR harus format ID|Nama|Jabatan
   const parts = decodedText.split("|");
-  if(parts.length < 3){
-    statusEl.innerText = "QR tidak valid ❌";
+  if(parts.length !== 3){
+    statusEl.innerText = "QR tidak valid atau tidak terdeteksi ❌";
+    statusEl.className = "error";
     isSubmitting = false;
     return;
   }
 
-  const entryData = {
-    id: parts[0],
-    nama: parts[1],
-    jabatan: parts[2]
-  };
-
-  // cek jika sudah scan hari ini
+  const entryData = { id: parts[0], nama: parts[1], jabatan: parts[2] };
   const todayKey = entryData.id + "_" + new Date().toLocaleDateString("id-ID");
+
+  // Cek apakah sudah scan hari ini
   if (scannedToday.has(todayKey)) {
     const now = new Date();
     const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
@@ -92,6 +92,7 @@ function onScanSuccess(decodedText) {
     const jam = now.toLocaleTimeString('id-ID');
 
     statusEl.innerText = "Sudah presensi hari ini ❌ Silakan besok lagi";
+    statusEl.className = "warning";
     rekapEl.innerText = `
 Nama: ${entryData.nama}
 Jabatan: ${entryData.jabatan}
@@ -102,6 +103,7 @@ Jam: ${jam}
     return;
   }
 
+  // Belum presensi → kirim ke Google Form
   scannedToday.add(todayKey);
   kirimForm(entryData);
 }
@@ -109,7 +111,7 @@ Jam: ${jam}
 // Callback scan gagal
 function onScanFailure(error) {}
 
-// Inisialisasi kamera & scanner otomatis
+// Inisialisasi kamera
 window.onload = function() {
   Html5Qrcode.getCameras().then(cameras => {
     if (cameras && cameras.length) {
@@ -123,10 +125,12 @@ window.onload = function() {
       );
     } else {
       statusEl.innerText = "Kamera tidak ditemukan ❌";
+      statusEl.className = "error";
     }
   }).catch(err => {
     console.error(err);
     statusEl.innerText = "Tidak bisa mengakses kamera ❌";
+    statusEl.className = "error";
   });
 };
 </script>
