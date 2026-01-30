@@ -29,7 +29,7 @@ const rekapEl = document.getElementById("rekap");
 // Google Form URL
 const FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSckBacoI9-VNL-QZnlepSUKIYHo_tMLH7DRuuUxSCQp-lE56g/formResponse";
 
-// Track karyawan yang sudah scan hari ini
+// Track karyawan yang sudah scan hari ini (berdasarkan ID + Nama)
 let scannedToday = new Set();
 let isSubmitting = false;
 
@@ -82,7 +82,7 @@ function onScanSuccess(decodedText) {
   }
 
   const entryData = { id: parts[0], nama: parts[1], jabatan: parts[2] };
-  const todayKey = entryData.id + "_" + new Date().toLocaleDateString("id-ID");
+  const todayKey = entryData.id + "|" + entryData.nama + "_" + new Date().toLocaleDateString("id-ID");
 
   // Cek apakah sudah scan hari ini
   if (scannedToday.has(todayKey)) {
